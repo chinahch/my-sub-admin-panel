@@ -3,157 +3,269 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>私人订阅管理面板</title>
+    <title>私人节点控制台</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
-        /* ... 样式保持不变 ... */
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif; background-color: #f0f2f5; margin: 0; padding: 20px; display: flex; justify-content: center; align-items: flex-start; min-height: 100vh; box-sizing: border-box; }
-        .container { background-color: #ffffff; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1); width: 100%; max-width: 600px; box-sizing: border-box; }
-        h1 { color: #333; text-align: center; margin-bottom: 30px; }
-        label { display: block; margin-bottom: 8px; color: #555; font-weight: 500; }
-        input[type="text"],
-        textarea {
-            width: calc(100% - 20px);
-            padding: 12px 10px;
-            margin-bottom: 20px;
-            border: 1px solid #ccc;
-            border-radius: 8px;
-            font-size: 1rem;
-            box-sizing: border-box;
-        }
-        textarea { min-height: 200px; resize: vertical; font-family: monospace; }
-        button {
-            background-color: #007bff;
-            color: white;
-            padding: 14px 25px;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 1.1rem;
-            width: 100%;
-            transition: background-color 0.3s ease;
-        }
-        button:hover { background-color: #0056b3; }
-        #statusMessage { margin-top: 20px; text-align: center; font-weight: bold; }
-        .success { color: #28a745; }
-        .error { color: #dc3545; }
-        .loading { color: #ffc107; }
-        .info { color: #17a2b8; }
-        .worker-url-info {
-            background-color: #e9ecef;
-            padding: 15px;
-            border-radius: 8px;
-            margin-top: 25px;
-            font-size: 0.9em;
-            color: #495057;
-        }
-        .worker-url-info code {
-            background-color: #f8f9fa;
-            padding: 2px 5px;
-            border-radius: 4px;
-            font-weight: bold;
-            color: #e83e8c;
-            word-break: break-all;
-        }
+        body { background-color: #f3f4f6; }
+        .glass-card { background: white; border-radius: 1rem; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); }
+        .btn-primary { background-color: #4f46e5; color: white; transition: all 0.2s; }
+        .btn-primary:hover { background-color: #4338ca; }
+        .input-field { border: 1px solid #e5e7eb; border-radius: 0.5rem; padding: 0.5rem 0.75rem; width: 100%; outline: none; transition: border-color 0.2s; }
+        .input-field:focus { border-color: #4f46e5; ring: 2px solid #c7d2fe; }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>私人订阅管理面板 (分组版)</h1>
+    <div id="app" class="min-h-screen flex flex-col md:flex-row">
+        
+        <aside class="bg-white w-full md:w-64 flex-shrink-0 border-r border-gray-200 hidden md:block">
+            <div class="h-16 flex items-center justify-center border-b border-gray-200">
+                <h1 class="text-xl font-bold text-indigo-600"><i class="fas fa-network-wired mr-2"></i>NodePanel</h1>
+            </div>
+            <div class="p-4 space-y-2">
+                <a href="#" class="flex items-center px-4 py-3 bg-indigo-50 text-indigo-700 rounded-lg font-medium">
+                    <i class="fas fa-tachometer-alt w-6"></i> 仪表盘
+                </a>
+                <a href="#" @click="openSettings" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-50 rounded-lg transition">
+                    <i class="fas fa-cog w-6"></i> 系统设置
+                </a>
+            </div>
+        </aside>
 
-        <div class="worker-url-info">
-            <p><strong>新的订阅地址格式:</strong> <code>https://YOUR_WORKER_DOMAIN.workers.dev/sub/分组名称</code></p>
+        <main class="flex-1 p-6 overflow-y-auto">
+            <div class="md:hidden mb-6 flex justify-between items-center">
+                <h1 class="text-xl font-bold text-indigo-600">NodePanel</h1>
+                <button @click="openSettings" class="text-gray-600"><i class="fas fa-cog text-xl"></i></button>
+            </div>
+
+            <div class="mb-8 flex justify-between items-end">
+                <div>
+                    <h2 class="text-2xl font-bold text-gray-800">订阅管理</h2>
+                    <p class="text-gray-500 mt-1">管理您的分流节点与订阅链接</p>
+                </div>
+                <button @click="addGroup" class="btn-primary px-4 py-2 rounded-lg shadow-md flex items-center">
+                    <i class="fas fa-plus mr-2"></i> 新增分组
+                </button>
+            </div>
+
+            <div v-if="!config.url || !config.secret" class="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-6 rounded-r">
+                <div class="flex">
+                    <div class="flex-shrink-0"><i class="fas fa-exclamation-triangle text-yellow-400"></i></div>
+                    <div class="ml-3">
+                        <p class="text-sm text-yellow-700">
+                            系统未配置。请点击 <button @click="openSettings" class="font-bold underline">设置</button> 填写 Worker 地址和密钥。
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                
+                <div v-for="(content, name) in groups" :key="name" class="glass-card p-6 relative group hover:shadow-lg transition">
+                    <div class="flex justify-between items-start mb-4">
+                        <div class="flex items-center">
+                            <div class="h-10 w-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 mr-3">
+                                <i class="fas fa-cube"></i>
+                            </div>
+                            <div>
+                                <h3 class="font-bold text-lg text-gray-800">{{ name }}</h3>
+                                <p class="text-xs text-gray-400">{{ getLineCount(content) }} 个节点资源</p>
+                            </div>
+                        </div>
+                        <div class="flex space-x-2">
+                            <button @click="editGroup(name)" class="text-gray-400 hover:text-indigo-600 p-2"><i class="fas fa-edit"></i></button>
+                            <button @click="deleteGroup(name)" class="text-gray-400 hover:text-red-500 p-2"><i class="fas fa-trash"></i></button>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-gray-50 rounded p-3 mb-4 h-24 overflow-hidden text-xs text-gray-500 font-mono break-all relative">
+                        {{ content.substring(0, 150) }}...
+                        <div class="absolute bottom-0 left-0 w-full h-8 bg-gradient-to-t from-gray-50 to-transparent"></div>
+                    </div>
+
+                    <div class="flex items-center justify-between mt-2 pt-4 border-t border-gray-100">
+                        <span class="text-xs text-gray-400">订阅链接</span>
+                        <button @click="copySubLink(name)" class="text-sm text-indigo-600 font-medium hover:text-indigo-800 flex items-center">
+                            <i class="far fa-copy mr-1"></i> 复制链接
+                        </button>
+                    </div>
+                </div>
+
+                <div v-if="Object.keys(groups).length === 0 && config.url" class="col-span-full py-12 text-center text-gray-400 bg-white rounded-xl border-2 border-dashed border-gray-200">
+                    <i class="fas fa-inbox text-4xl mb-3 text-gray-300"></i>
+                    <p>暂无订阅分组，请点击右上角新增</p>
+                </div>
+            </div>
+
+            <div v-if="hasChanges" class="fixed bottom-6 right-6 left-6 md:left-auto md:w-96 bg-gray-900 text-white p-4 rounded-xl shadow-2xl flex justify-between items-center animate-bounce-small z-50">
+                <span><i class="fas fa-info-circle mr-2"></i> 您有未保存的更改</span>
+                <button @click="saveToWorker" :disabled="loading" class="bg-indigo-500 hover:bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold transition flex items-center">
+                    <span v-if="loading"><i class="fas fa-spinner fa-spin mr-2"></i> 保存中...</span>
+                    <span v-else>立即同步至 Worker</span>
+                </button>
+            </div>
+
+        </main>
+
+        <div v-if="showSettings" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div class="bg-white rounded-xl w-full max-w-md p-6 shadow-2xl">
+                <h3 class="text-xl font-bold mb-4">系统设置</h3>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Worker Admin URL</label>
+                        <input v-model="tempConfig.url" type="text" placeholder="https://xxx.workers.dev/admin/key" class="input-field">
+                        <p class="text-xs text-gray-400 mt-1">完整的管理接口地址 (POST)</p>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Admin Secret</label>
+                        <input v-model="tempConfig.secret" type="password" placeholder="密钥" class="input-field">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Worker Sub Prefix</label>
+                        <input v-model="tempConfig.subPrefix" type="text" placeholder="https://xxx.workers.dev/sub/" class="input-field">
+                        <p class="text-xs text-gray-400 mt-1">用于生成复制链接，结尾带 /</p>
+                    </div>
+                </div>
+                <div class="mt-6 flex justify-end space-x-3">
+                    <button @click="showSettings = false" class="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg">取消</button>
+                    <button @click="saveSettings" class="btn-primary px-4 py-2 rounded-lg">保存设置</button>
+                </div>
+            </div>
         </div>
 
-        <label for="adminUrl">Worker 管理地址 (例如: https://your.workers.dev/admin/secret)</label>
-        <input type="text" id="adminUrl" placeholder="输入 Worker 管理地址" value="" required>
+        <div v-if="showEditor" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div class="bg-white rounded-xl w-full max-w-lg p-6 shadow-2xl flex flex-col max-h-[90vh]">
+                <h3 class="text-xl font-bold mb-4">{{ isEditing ? '编辑分组' : '新增分组' }}</h3>
+                <div class="space-y-4 flex-1 overflow-y-auto">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">分组名称 (ID)</label>
+                        <input v-model="currentGroup.name" :disabled="isEditing" type="text" placeholder="例如: VIP_US" class="input-field">
+                        <p v-if="isEditing" class="text-xs text-gray-400 mt-1">分组ID无法修改，请新建。</p>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">节点内容</label>
+                        <textarea v-model="currentGroup.content" placeholder="vmess://...&#10;ss://..." class="input-field h-64 font-mono text-sm"></textarea>
+                    </div>
+                </div>
+                <div class="mt-6 flex justify-end space-x-3">
+                    <button @click="showEditor = false" class="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg">取消</button>
+                    <button @click="confirmGroup" class="btn-primary px-4 py-2 rounded-lg">确认</button>
+                </div>
+            </div>
+        </div>
 
-        <label for="adminSecret">管理密钥 (X-Admin-Secret)</label>
-        <input type="text" id="adminSecret" placeholder="输入您的管理密钥" value="" required>
-
-        <label for="subscriptionContent">订阅内容 (JSON 格式：键为分组名称，值为节点内容)</label>
-        <textarea id="subscriptionContent" placeholder='粘贴 JSON 格式内容，例如：{
-  "VIP_Group": "vmess://...",
-  "Free_Group": "ss://...",
-  "Full_List": "vmess://... \n ss://..."
-}' required></textarea>
-
-        <button id="updateButton">更新所有分组订阅</button>
-        <div id="statusMessage"></div>
     </div>
 
     <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            const adminUrlInput = document.getElementById('adminUrl');
-            const adminSecretInput = document.getElementById('adminSecret');
-            const subscriptionContentTextarea = document.getElementById('subscriptionContent');
-            const updateButton = document.getElementById('updateButton');
-            const statusMessage = document.getElementById('statusMessage');
+        const { createApp, ref, computed, onMounted } = Vue;
 
-            // 尝试从 localStorage 加载保存的值
-            adminUrlInput.value = localStorage.getItem('adminUrl') || '';
-            adminSecretInput.value = localStorage.getItem('adminSecret') || '';
+        createApp({
+            setup() {
+                const config = ref({ url: '', secret: '', subPrefix: '' });
+                const tempConfig = ref({});
+                const groups = ref({});
+                const showSettings = ref(false);
+                const showEditor = ref(false);
+                const isEditing = ref(false);
+                const loading = ref(false);
+                const hasChanges = ref(false);
+                const currentGroup = ref({ name: '', content: '' });
 
-            updateButton.addEventListener('click', async () => {
-                const adminUrl = adminUrlInput.value.trim();
-                const adminSecret = adminSecretInput.value.trim();
-                const subContentText = subscriptionContentTextarea.value.trim();
+                // 初始化
+                onMounted(() => {
+                    const savedConfig = localStorage.getItem('nodePanelConfig');
+                    const savedData = localStorage.getItem('nodePanelData');
+                    if (savedConfig) config.value = JSON.parse(savedConfig);
+                    if (savedData) groups.value = JSON.parse(savedData);
+                });
 
-                if (!adminUrl || !adminSecret || !subContentText) {
-                    displayStatus('error', '请填写所有字段。');
-                    return;
-                }
+                // 设置相关
+                const openSettings = () => {
+                    tempConfig.value = { ...config.value };
+                    showSettings.value = true;
+                };
+                const saveSettings = () => {
+                    config.value = { ...tempConfig.value };
+                    localStorage.setItem('nodePanelConfig', JSON.stringify(config.value));
+                    showSettings.value = false;
+                };
 
-                let groupData;
-                try {
-                    // 尝试解析 JSON
-                    groupData = JSON.parse(subContentText);
-                    // 检查解析结果是否是对象
-                    if (typeof groupData !== 'object' || groupData === null) {
-                         throw new Error("Parsed content is not a valid JSON object.");
+                // 分组操作
+                const addGroup = () => {
+                    currentGroup.value = { name: '', content: '' };
+                    isEditing.value = false;
+                    showEditor.value = true;
+                };
+                const editGroup = (name) => {
+                    currentGroup.value = { name: name, content: groups.value[name] };
+                    isEditing.value = true;
+                    showEditor.value = true;
+                };
+                const deleteGroup = (name) => {
+                    if(confirm(`确定要删除分组 "${name}" 吗？`)) {
+                        delete groups.value[name];
+                        hasChanges.value = true;
+                        saveLocal();
                     }
-                } catch (e) {
-                    displayStatus('error', `JSON 格式错误: ${e.message}`);
-                    return;
-                }
+                };
+                const confirmGroup = () => {
+                    if (!currentGroup.value.name) return alert('请输入分组名称');
+                    groups.value[currentGroup.value.name] = currentGroup.value.content;
+                    showEditor.value = false;
+                    hasChanges.value = true;
+                    saveLocal();
+                };
 
-                displayStatus('loading', '正在更新...');
-                updateButton.disabled = true;
+                // 本地存储
+                const saveLocal = () => {
+                    localStorage.setItem('nodePanelData', JSON.stringify(groups.value));
+                };
 
-                try {
-                    localStorage.setItem('adminUrl', adminUrl);
-                    localStorage.setItem('adminSecret', adminSecret);
+                // 辅助功能
+                const getLineCount = (text) => {
+                    if (!text) return 0;
+                    return text.split(/\r\n|\r|\n/).filter(line => line.trim() !== '').length;
+                };
+                const copySubLink = (name) => {
+                    if (!config.value.subPrefix) return alert('请先在设置中配置订阅前缀');
+                    const link = config.value.subPrefix + name;
+                    navigator.clipboard.writeText(link).then(() => alert('订阅链接已复制: ' + link));
+                };
 
-                    const response = await fetch(adminUrl, {
-                        method: 'POST',
-                        // 注意: Content-Type 更改为 application/json
-                        headers: {
-                            'Content-Type': 'application/json', 
-                            'X-Admin-Secret': adminSecret
-                        },
-                        // 发送 JSON 字符串
-                        body: JSON.stringify(groupData) 
-                    });
-
-                    const responseText = await response.text();
-
-                    if (response.ok) {
-                        displayStatus('success', '订阅内容更新成功！Worker 返回:\n' + responseText.replace(/\n/g, '<br>'));
-                    } else {
-                        displayStatus('error', `更新失败: ${response.status} - ${responseText}`);
+                // 核心：推送到 Worker
+                const saveToWorker = async () => {
+                    if (!config.value.url || !config.value.secret) return alert('请先配置 Worker 信息');
+                    loading.value = true;
+                    try {
+                        const response = await fetch(config.value.url, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-Admin-Secret': config.value.secret
+                            },
+                            body: JSON.stringify(groups.value)
+                        });
+                        if (response.ok) {
+                            alert('同步成功！');
+                            hasChanges.value = false;
+                        } else {
+                            alert('同步失败: ' + await response.text());
+                        }
+                    } catch (e) {
+                        alert('网络错误: ' + e.message);
+                    } finally {
+                        loading.value = false;
                     }
-                } catch (error) {
-                    displayStatus('error', `请求出错: ${error.message}`);
-                } finally {
-                    updateButton.disabled = false;
-                }
-            });
+                };
 
-            function displayStatus(type, message) {
-                statusMessage.className = '';
-                statusMessage.classList.add(type);
-                statusMessage.innerHTML = message; // 使用 innerHTML 渲染换行符
+                return {
+                    config, tempConfig, groups, showSettings, showEditor, isEditing, loading, hasChanges, currentGroup,
+                    openSettings, saveSettings, addGroup, editGroup, deleteGroup, confirmGroup,
+                    getLineCount, copySubLink, saveToWorker
+                };
             }
-        });
+        }).mount('#app');
     </script>
 </body>
 </html>
