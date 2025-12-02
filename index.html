@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>私人订阅管理面板</title>
     <style>
+        /* ... 样式保持不变 ... */
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif; background-color: #f0f2f5; margin: 0; padding: 20px; display: flex; justify-content: center; align-items: flex-start; min-height: 100vh; box-sizing: border-box; }
         .container { background-color: #ffffff; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1); width: 100%; max-width: 600px; box-sizing: border-box; }
         h1 { color: #333; text-align: center; margin-bottom: 30px; }
@@ -57,24 +58,26 @@
 </head>
 <body>
     <div class="container">
-        <h1>私人订阅管理面板</h1>
+        <h1>私人订阅管理面板 (分组版)</h1>
 
         <div class="worker-url-info">
-            <p>请确保已部署 Worker 并获取其 URL 和配置的路径/密钥。</p>
-            <p><strong>Worker Admin URL (POST):</strong> <code id="workerAdminUrlDisplay">https://YOUR_WORKER_DOMAIN.workers.dev/ADMIN_PATH</code></p>
-            <p><strong>Worker Subscription URL (GET):</strong> <code id="workerSubUrlDisplay">https://YOUR_WORKER_DOMAIN.workers.dev/SUB_PATH</code></p>
+            <p><strong>新的订阅地址格式:</strong> <code>https://YOUR_WORKER_DOMAIN.workers.dev/sub/分组名称</code></p>
         </div>
 
-        <label for="adminUrl">Worker 管理地址 (例如: https://your.workers.dev/update/secret)</label>
+        <label for="adminUrl">Worker 管理地址 (例如: https://your.workers.dev/admin/secret)</label>
         <input type="text" id="adminUrl" placeholder="输入 Worker 管理地址" value="" required>
 
         <label for="adminSecret">管理密钥 (X-Admin-Secret)</label>
         <input type="text" id="adminSecret" placeholder="输入您的管理密钥" value="" required>
 
-        <label for="subscriptionContent">订阅内容 (Vmess/Clash/Surge 等)</label>
-        <textarea id="subscriptionContent" placeholder="在此粘贴您的所有节点内容..." required></textarea>
+        <label for="subscriptionContent">订阅内容 (JSON 格式：键为分组名称，值为节点内容)</label>
+        <textarea id="subscriptionContent" placeholder='粘贴 JSON 格式内容，例如：{
+  "VIP_Group": "vmess://...",
+  "Free_Group": "ss://...",
+  "Full_List": "vmess://... \n ss://..."
+}' required></textarea>
 
-        <button id="updateButton">更新订阅</button>
+        <button id="updateButton">更新所有分组订阅</button>
         <div id="statusMessage"></div>
     </div>
 
@@ -93,49 +96,62 @@
             updateButton.addEventListener('click', async () => {
                 const adminUrl = adminUrlInput.value.trim();
                 const adminSecret = adminSecretInput.value.trim();
-                const subContent = subscriptionContentTextarea.value.trim();
+                const subContentText = subscriptionContentTextarea.value.trim();
 
-                if (!adminUrl || !adminSecret || !subContent) {
+                if (!adminUrl || !adminSecret || !subContentText) {
                     displayStatus('error', '请填写所有字段。');
                     return;
                 }
 
+                let groupData;
+                try {
+                    // 尝试解析 JSON
+                    groupData = JSON.parse(subContentText);
+                    // 检查解析结果是否是对象
+                    if (typeof groupData !== 'object' || groupData === null) {
+                         throw new Error("Parsed content is not a valid JSON object.");
+                    }
+                } catch (e) {
+                    displayStatus('error', `JSON 格式错误: ${e.message}`);
+                    return;
+                }
+
                 displayStatus('loading', '正在更新...');
-                updateButton.disabled = true; // 禁用按钮防止重复提交
+                updateButton.disabled = true;
 
                 try {
-                    // 保存输入到 localStorage
                     localStorage.setItem('adminUrl', adminUrl);
                     localStorage.setItem('adminSecret', adminSecret);
 
                     const response = await fetch(adminUrl, {
                         method: 'POST',
+                        // 注意: Content-Type 更改为 application/json
                         headers: {
-                            'Content-Type': 'text/plain',
+                            'Content-Type': 'application/json', 
                             'X-Admin-Secret': adminSecret
                         },
-                        body: subContent
+                        // 发送 JSON 字符串
+                        body: JSON.stringify(groupData) 
                     });
 
+                    const responseText = await response.text();
+
                     if (response.ok) {
-                        displayStatus('success', '订阅内容更新成功！');
-                        // 可以清空或不清除，看个人习惯
-                        // subscriptionContentTextarea.value = ''; 
+                        displayStatus('success', '订阅内容更新成功！Worker 返回:\n' + responseText.replace(/\n/g, '<br>'));
                     } else {
-                        const errorText = await response.text();
-                        displayStatus('error', `更新失败: ${response.status} - ${errorText}`);
+                        displayStatus('error', `更新失败: ${response.status} - ${responseText}`);
                     }
                 } catch (error) {
                     displayStatus('error', `请求出错: ${error.message}`);
                 } finally {
-                    updateButton.disabled = false; // 重新启用按钮
+                    updateButton.disabled = false;
                 }
             });
 
             function displayStatus(type, message) {
-                statusMessage.className = ''; // 清除所有类
-                statusMessage.classList.add(type); // 添加新的类
-                statusMessage.textContent = message;
+                statusMessage.className = '';
+                statusMessage.classList.add(type);
+                statusMessage.innerHTML = message; // 使用 innerHTML 渲染换行符
             }
         });
     </script>
